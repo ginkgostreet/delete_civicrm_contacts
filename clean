@@ -22,6 +22,8 @@ $args->addOption(array('id-col', 'i'), array(
   'description' => 'CiviCRM Contact ID Column',
 ));
 
+$args->addFlag(array('undelete', 'ctrl-z', 'z'), 'Remove contacts from the trash is_deleted => false');
+
 $msg = <<<USAGE
 Show this help screen
 
@@ -48,8 +50,14 @@ define('ID_COLUMN', getOption('id-col', $args));
 $input = getOption('input-file', $args);
 
 $jobDate = shell('date +"%F %R"');
-$apiTag = createJobTag($jobDate, 'Delete CiviCRM Contacts');
 
+if ($args['undelete']) {
+  define('UNDELETE', TRUE);
+  $apiTag = createJobTag($jobDate, 'UNDelete CiviCRM Contacts');
+} else {
+  define('UNDELETE', FALSE);
+  $apiTag = createJobTag($jobDate, 'Delete CiviCRM Contacts');
+}
 define('TAG_ID', $apiTag->id);
 
 $main = 'processContacts';
@@ -64,7 +72,11 @@ withFile($input, $main);
 function processContact($cont) {
   if (!$cont) return;
   tagContact($cont[ID_COLUMN], TAG_ID);
-  markContactDeleted($cont[ID_COLUMN]);
+  if (UNDELETE) {
+    removeFromTrash($cont[ID_COLUMN]);
+  } else {
+    markContactDeleted($cont[ID_COLUMN]);
+  }
 }
 
 /**
@@ -74,7 +86,20 @@ function processContact($cont) {
  */
 function markContactDeleted($cont_id) {
   $apiResult = cvApi("contact.delete id={$cont_id}");
-  cli\line("Contact ID#{$cont_id} moved to Trash.");
+  if ($apiResult->is_error) {
+    cli\out(var_export($apiResult, TRUE));
+  } else {
+    cli\line("Contact ID#{$cont_id} moved to Trash.");
+  }
+}
+
+function removeFromTrash($cont_id) {
+  $apiResult = cvAPI("contact.create id={$cont_id} is_deleted=false");
+  if ($apiResult->is_error) {
+    var_dump($apiResult);
+  } else {
+    cli\line("Contact ID#{$cont_id} removed from Trash.");
+  }
 }
 
 $fieldDefinition = array();
