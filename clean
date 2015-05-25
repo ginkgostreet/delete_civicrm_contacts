@@ -36,6 +36,13 @@ $input = getOption('input-file', $args);
 withFile($input, $main);
 
 $fieldDefinition = array();
+/**
+ * Called in the loop, so must use global variable;
+ * 
+ * @global array $fieldDefinition
+ * @param type $line
+ * @param type $index
+ */
 function processContacts($line, $index) {
   global $fieldDefinition;
 
