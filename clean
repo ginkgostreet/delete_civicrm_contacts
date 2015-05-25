@@ -31,18 +31,14 @@ Example
 USAGE;
 
 $args->addFlag(array('help', 'h', 'usage', 'u'), $msg);
-
+$args->parse();
+if ($args['help']) {
+	die($args->getHelpScreen()."\n");
+}
 
 /**
  * END CONFIG
  */
-
-$args->parse();
-if ($args['help']) {
-	echo $args->getHelpScreen();
-	echo "\n";
-  exit;
-}
 
 define('CIVICRM_ROOT', getOption('civi-root', $args));
 validateApiConfig();
