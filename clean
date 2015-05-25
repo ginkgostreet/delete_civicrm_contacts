@@ -25,20 +25,70 @@ if ($args['civi-root']) {
 }
 validateApiConfig();
 
+$main = 'processContacts';
 if ($args['input-file']) {
-  withFile($userInput['input-file'], 'echoLine');
+  withFile($userInput['input-file'], $main);
 } else {
-  withStdIn('echoLine');
+  withStdIn($main);
+}
+
+$fieldDefinition = array();
+function processContacts($line, $index) {
+  global $fieldDefinition;
+
+  processContact(parseCSV($line, $index, $fieldDefinition));
+}
+
+function processContact($cont) {
+ echo 'processContact'."\n";
+ addToContactGroup($cont);
+ markContactDeleted($cont);
+}
+
+function addToContactGroup($cont) {
+  echo 'addToContactGroup'
+    . $cont['Internal Contact ID']
+    . "\n";
+}
+
+function markContactDeleted($cont) {
+  echo 'markContactDeleted'
+    . $cont['Internal Contact ID']
+    . "\n";
 }
 
 /**
  * diagnostic function
- * 
+ *
  * @param type $line
  * @param type $index
  */
 function echoLine($line, $index) {
   echo $index . ':' . $line . "\n";
+}
+
+/**
+ * Loop Callback utility to create an array from a csv file.
+ * Associative array if $index and $fieldDefinition are provided.
+ *
+ * @param string $line
+ * @param int $index
+ * @param array $fieldDefinition keys
+ * @return array
+ */
+function parseCsv($line, $index=NULL, &$fieldDefinition=NULL) {
+  $values = str_getcsv($line, ',', '"');
+  if ($index === 0) {
+    $fieldDefinition = $values;
+  } else if ($fieldDefinition) {
+    if (count($fieldDefinition) == count($values)) {
+      return array_combine($fieldDefinition, $values);
+    } else {
+      cli\err("field definition did not match:\n". var_export($values, TRUE));
+    }
+  } else {
+    return $values;
+  }
 }
 
 /**
@@ -117,7 +167,7 @@ function withFile($file, $function_name, $dontMask = array()) {
 
   $n=0;
   while (($line = fgets($file)) !== FALSE) {
-    $n++;
     $function_name(trim($line, $charmask), $n);
+    $n++;
   }
 }
