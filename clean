@@ -42,18 +42,30 @@ function processContacts($line, $index) {
   processContact(parseCSV($line, $index, $fieldDefinition));
 }
 
+/**
+ * TODO:
+ * @param type $cont
+ */
 function processContact($cont) {
  echo 'processContact'."\n";
  addToContactGroup($cont);
  markContactDeleted($cont);
 }
 
+/**
+ * TODO:
+ * @param type $cont
+ */
 function addToContactGroup($cont) {
   echo 'addToContactGroup'
     . $cont[ID_COLUMN]
     . "\n";
 }
 
+/**
+ * TODO:
+ * @param type $cont
+ */
 function markContactDeleted($cont) {
   echo 'markContactDeleted'
     . $cont[ID_COLUMN]
