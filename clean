@@ -45,8 +45,14 @@ validateApiConfig();
 
 define('ID_COLUMN', getOption('id-col', $args));
 
-$main = 'processContacts';
 $input = getOption('input-file', $args);
+
+$jobDate = shell('date +"%F %R"');
+$apiTag = createJobTag($jobDate, 'Delete CiviCRM Contacts');
+
+define('TAG_ID', $apiTag->id);
+
+$main = 'processContacts';
 withFile($input, $main);
 
 $fieldDefinition = array();
@@ -63,12 +69,21 @@ function processContacts($line, $index) {
   processContact(parseCSV($line, $index, $fieldDefinition));
 }
 
+function tagContact($cont_id, $tag_id) {
+  return cvApi("entity_tag.create contact_id=$cont_id tag_id=$tag_id");
+}
+
 function createJobTag($date_str, $job_action) {
   $apiCall = <<<JOBTAG
 tag.create name="$date_str" description="Bulk Script $job_action Contacts $date_str"
 JOBTAG
     ;
-  return cvApi($apiCall);
+  $apiResult = cvApi($apiCall);
+  $values = get_object_vars($apiResult->values);
+  foreach($values as $tag) {
+    cli\out("Created tag: {$tag->name} \n");
+  }
+  return $apiResult;
 }
 
 /**
@@ -77,18 +92,8 @@ JOBTAG
  */
 function processContact($cont) {
  echo 'processContact'."\n";
- addToContactGroup($cont);
+ tagContact($cont[ID_COLUMN], TAG_ID);
  markContactDeleted($cont);
-}
-
-/**
- * TODO:
- * @param type $cont
- */
-function addToContactGroup($cont) {
-  echo 'addToContactGroup'
-    . $cont[ID_COLUMN]
-    . "\n";
 }
 
 /**
