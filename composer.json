@@ -1,0 +1,13 @@
+{
+    "name": "gsl/delete_contacts",
+    "description": "Delete CiviCRM Contacts from STDIN.",
+    "require": {
+        "wp-cli/php-cli-tools": "0.10.*"
+    },
+    "authors": [
+        {
+            "name": "Ginkgo Street Labs",
+            "email": "inquire@ginkgostreet.com"
+        }
+    ]
+}

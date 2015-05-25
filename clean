@@ -1,0 +1,123 @@
+#!/usr/bin/php
+<?php
+
+require __DIR__ . '/vendor/autoload.php';
+
+$CONF_CIVICRM_ROOT='/var/www/ncba/ncba/sites/all/modules/civicrm';
+
+$args = new \cli\Arguments();
+
+$args->addOption(array('civi-root', 'r'), array(
+  'default' => $CONF_CIVICRM_ROOT,
+  'description' => 'Path to CiviCRM',
+  ));
+
+$args->addOption(array('input-file', 'f'), array(
+  'description' => 'File to act on',
+));
+
+$userInput = $args->getArguments();
+
+if ($args['civi-root']) {
+  $CIVICRM_ROOT = $userInput['civi-root'];
+} else {
+  $CIVICRM_ROOT = $CONF_CIVICRM_ROOT;
+}
+validateApiConfig();
+
+if ($args['input-file']) {
+  withFile($userInput['input-file'], 'echoLine');
+} else {
+  withStdIn('echoLine');
+}
+
+/**
+ * diagnostic function
+ * 
+ * @param type $line
+ * @param type $index
+ */
+function echoLine($line, $index) {
+  echo $index . ':' . $line . "\n";
+}
+
+/**
+ * Execute drush cvapi
+ * confirm CiviCRM Root
+ *
+ * @param $apiCall e.g. ext.install key='org.civicrm.volunteer'
+ * @param $toStdOut FALSE
+ * @return PHP Object from CiviCRM API result
+ **/
+function cvApi($apiCall, $toStdOut=FALSE) {
+  global $CIVICRM_ROOT;
+  $CVAPI = 'drush cvapi';
+
+  if (!is_dir($CIVICRM_ROOT)) {
+    throw new Exception('CIVICRM_ROOT is undefined');
+  }
+
+  $cacheDir = getcwd();
+  chdir($CIVICRM_ROOT);
+
+  $output = $return_var = null;
+  if ($toStdOut) {
+    system("$CVAPI $apiCall --out=pretty", $return_var);
+    chdir($cacheDir);
+    return $return_var;
+  } else {
+    exec("$CVAPI $apiCall --out=json", $output, $return_var);
+    chdir($cacheDir);
+    return json_decode(join($output));
+  }
+}
+
+function validateApiConfig() {
+  $apiResult = cvApi('domain.get');
+
+  if (!$apiResult || $apiResult->is_error == 1) {
+    echo "FAILED to validate API connection\n";
+    if ($apiResult->is_error) {
+      echo $apiResult->error_message;
+    }
+    die("\nexit");
+  }
+}
+
+/**
+ * Callback per line from STDIN
+ *
+ * @param type $function_name e.g. - myCallback($line, $index) {...}
+ * @param array $dontMask Optional. Remove items from character_mask argument to trim() - e.g. array("\n", "\t"); Note double-quotes.
+ */
+function withStdIn($function_name, $dontMask = array()) {
+  withFile(STDIN, $function_name, $dontMask);
+}
+/**
+ * Callback per line from $file
+ *
+ * @param type $function_name e.g. - myCallback($line, $index) {...}
+ * @param array $dontMask Optional. Remove items from character_mask argument to trim() - e.g. array("\n", "\t"); Note double-quotes.
+ */
+function withFile($file, $function_name, $dontMask = array()) {
+
+  if ( !is_resource($file)) {
+    //try to open it
+    $file = fopen($file, 'r');
+  } else if (get_resource_type($file) !== "stream") {
+    throw new Exception("Resources is not a file.");
+  }
+
+  if ( !function_exists($function_name)) {
+    throw new Exception("function name, \"$function_name\" does not exist;");
+  }
+
+  $dontMask = array_fill_keys($dontMask, '');
+  $charmask = strtr(" \t\n\r\0\x0B", $dontMask);
+
+  $n=0;
+  while (($line = fgets($file)) !== FALSE) {
+    $n++;
+    $function_name(trim($line, $charmask), $n);
+  }
+}
