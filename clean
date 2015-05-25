@@ -56,23 +56,25 @@ $main = 'processContacts';
 withFile($input, $main);
 
 /**
- * TODO:
- * @param type $cont
+ * Process a contact row
+ *
+ * @param array assoc $cont csv input line
+ * @return void
  */
 function processContact($cont) {
- echo 'processContact'."\n";
- tagContact($cont[ID_COLUMN], TAG_ID);
- markContactDeleted($cont);
+  if (!$cont) return;
+  tagContact($cont[ID_COLUMN], TAG_ID);
+  markContactDeleted($cont[ID_COLUMN]);
 }
 
 /**
- * TODO:
- * @param type $cont
+ * Call api contact.delete for contact ID
+ *
+ * @param int $cont_id
  */
-function markContactDeleted($cont) {
-  echo 'markContactDeleted'
-    . $cont[ID_COLUMN]
-    . "\n";
+function markContactDeleted($cont_id) {
+  $apiResult = cvApi("contact.delete id={$cont_id}");
+  cli\line("Contact ID#{$cont_id} moved to Trash.");
 }
 
 $fieldDefinition = array();
@@ -109,7 +111,7 @@ function tagContact($cont_id, $tag_id) {
  */
 function createJobTag($date_str, $job_action) {
   $apiCall = <<<JOBTAG
-tag.create name="$date_str" description="Bulk Script $job_action Contacts $date_str"
+tag.create name="$date_str $job_action" description="Bulk Script $job_action Contacts $date_str"
 JOBTAG
     ;
   $apiResult = cvApi($apiCall);
