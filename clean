@@ -14,7 +14,7 @@ $args->addOption(array('civi-root', 'r'), array(
 
 $args->addOption(array('input-file', 'f'), array(
   'default' => STDIN,
-  'description' => 'File to act on',
+  'description' => 'File to act on. Alternate to pipe to STDIN',
 ));
 
 $args->addOption(array('id-col', 'i'), array(
@@ -22,9 +22,27 @@ $args->addOption(array('id-col', 'i'), array(
   'description' => 'CiviCRM Contact ID Column',
 ));
 
+$msg = <<<USAGE
+Show this help screen
+
+Example
+  ./clean --input-file my.csv --civi-root /var/www/sites/all/modules/civicrm --id-col 'Internal Contact ID;
+
+USAGE;
+
+$args->addFlag(array('help', 'h', 'usage', 'u'), $msg);
+
+
 /**
  * END CONFIG
  */
+
+$args->parse();
+if ($args['help']) {
+	echo $args->getHelpScreen();
+	echo "\n";
+  exit;
+}
 
 define('CIVICRM_ROOT', getOption('civi-root', $args));
 validateApiConfig();
