@@ -26,7 +26,7 @@ $args->addOption(array('id-col', 'i'), array(
  * END CONFIG
  */
 
-$CIVICRM_ROOT = getOption('civi-root', $args);
+define('CIVICRM_ROOT', getOption('civi-root', $args));
 validateApiConfig();
 
 define('ID_COLUMN', getOption('id-col', $args));
@@ -133,15 +133,14 @@ function parseCsv($line, $index=NULL, &$fieldDefinition=NULL) {
  * @return PHP Object from CiviCRM API result
  **/
 function cvApi($apiCall, $toStdOut=FALSE) {
-  global $CIVICRM_ROOT;
   $CVAPI = 'drush cvapi';
 
-  if (!is_dir($CIVICRM_ROOT)) {
+  if (!is_dir(CIVICRM_ROOT)) {
     throw new Exception('CIVICRM_ROOT is undefined');
   }
 
   $cacheDir = getcwd();
-  chdir($CIVICRM_ROOT);
+  chdir(CIVICRM_ROOT);
 
   $output = $return_var = null;
   if ($toStdOut) {
