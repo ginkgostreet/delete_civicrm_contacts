@@ -55,37 +55,6 @@ define('TAG_ID', $apiTag->id);
 $main = 'processContacts';
 withFile($input, $main);
 
-$fieldDefinition = array();
-/**
- * Called in the loop, so must use global variable;
- *
- * @global array $fieldDefinition
- * @param type $line
- * @param type $index
- */
-function processContacts($line, $index) {
-  global $fieldDefinition;
-
-  processContact(parseCSV($line, $index, $fieldDefinition));
-}
-
-function tagContact($cont_id, $tag_id) {
-  return cvApi("entity_tag.create contact_id=$cont_id tag_id=$tag_id");
-}
-
-function createJobTag($date_str, $job_action) {
-  $apiCall = <<<JOBTAG
-tag.create name="$date_str" description="Bulk Script $job_action Contacts $date_str"
-JOBTAG
-    ;
-  $apiResult = cvApi($apiCall);
-  $values = get_object_vars($apiResult->values);
-  foreach($values as $tag) {
-    cli\out("Created tag: {$tag->name} \n");
-  }
-  return $apiResult;
-}
-
 /**
  * TODO:
  * @param type $cont
@@ -104,6 +73,51 @@ function markContactDeleted($cont) {
   echo 'markContactDeleted'
     . $cont[ID_COLUMN]
     . "\n";
+}
+
+$fieldDefinition = array();
+/**
+ * Called in the loop, so must use global variable;
+ *
+ * @global array $fieldDefinition
+ * @param type $line
+ * @param type $index
+ */
+function processContacts($line, $index) {
+  global $fieldDefinition;
+
+  processContact(parseCSV($line, $index, $fieldDefinition));
+}
+
+/**
+ * Tag CiviCRM Contact
+ *
+ * @param type $cont_id
+ * @param type $tag_id
+ * @return type
+ */
+function tagContact($cont_id, $tag_id) {
+  return cvApi("entity_tag.create contact_id=$cont_id tag_id=$tag_id");
+}
+
+/**
+ * Create a "Job" Tag based on a date and script verb.
+ *
+ * @param type $date_str
+ * @param type $job_action
+ * @return type
+ */
+function createJobTag($date_str, $job_action) {
+  $apiCall = <<<JOBTAG
+tag.create name="$date_str" description="Bulk Script $job_action Contacts $date_str"
+JOBTAG
+    ;
+  $apiResult = cvApi($apiCall);
+  $values = get_object_vars($apiResult->values);
+  foreach($values as $tag) {
+    cli\out("Created tag: {$tag->name} \n");
+  }
+  return $apiResult;
 }
 
 /**
@@ -236,6 +250,14 @@ function withFile($file, $function_name, $dontMask = array()) {
   }
 }
 
+/**
+ * Wrap php exec function with some helpers.
+ * Returns output of command.
+ *
+ * @param type $call system call
+ * @param string $chDir execute command in this dir
+ * @return string
+ */
 function shell($call, $chDir=NULL) {
   if ($chDir) {
     $cacheDir = getcwd();
