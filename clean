@@ -38,7 +38,7 @@ withFile($input, $main);
 $fieldDefinition = array();
 /**
  * Called in the loop, so must use global variable;
- * 
+ *
  * @global array $fieldDefinition
  * @param type $line
  * @param type $index
@@ -47,6 +47,14 @@ function processContacts($line, $index) {
   global $fieldDefinition;
 
   processContact(parseCSV($line, $index, $fieldDefinition));
+}
+
+function createJobTag($date_str, $job_action) {
+  $apiCall = <<<JOBTAG
+tag.create name="$date_str" description="Bulk Script $job_action Contacts $date_str"
+JOBTAG
+    ;
+  return cvApi($apiCall);
 }
 
 /**
@@ -207,4 +215,18 @@ function withFile($file, $function_name, $dontMask = array()) {
   if (!$meta['uri'] != 'php://stdin') {
     fclose($file);
   }
+}
+
+function shell($call, $chDir=NULL) {
+  if ($chDir) {
+    $cacheDir = getcwd();
+    chdir(CIVICRM_ROOT);
+  }
+  exec($call, $output, $return_var);
+
+  if ($chDir) {
+    chdir($cacheDir);
+  }
+
+  return join($output);
 }
