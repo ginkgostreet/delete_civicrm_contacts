@@ -2,13 +2,12 @@
 <?php
 
 require __DIR__ . '/vendor/autoload.php';
-
-$CONF_CIVICRM_ROOT='/var/www/ncba/ncba/sites/all/modules/civicrm';
+@extract(getConfig());
 
 $args = new \cli\Arguments();
 
 $args->addOption(array('civi-root', 'r'), array(
-  'default' => $CONF_CIVICRM_ROOT,
+  'default' => (@$config['CIVICRM_ROOT']) ? $config['CIVICRM_ROOT'] : __DIR__,
   'description' => 'Path to CiviCRM',
   ));
 
@@ -234,7 +233,7 @@ function validateApiConfig() {
 
   if (!$apiResult || $apiResult->is_error == 1) {
     echo "FAILED to validate API connection\n";
-    if ($apiResult->is_error) {
+    if (@$apiResult->is_error) {
       echo $apiResult->error_message;
     }
     die("\nexit");
@@ -297,4 +296,31 @@ function shell($call, $chDir=NULL) {
   }
 
   return join($output);
+}
+
+/**
+ * Try to get configs from a .conf file.
+ *
+ * e.g. -
+ * {
+ *   "config": {
+ *   "CIVICRM_ROOT": "/var/www/ncba/ncba/sites/all/modules/civicrm"
+ *   }
+ * }
+ *
+ * usage: @extract(getConfig());
+ *
+ * Safety for extract... enforce use of "config" envelope;
+ *
+ * @return array associative
+ */
+function getConfig() {
+  $confFile = __DIR__.'/.conf';
+  if (file_exists($confFile)) {
+    $configs = json_decode(file_get_contents($confFile), TRUE); //assoc array
+  }
+  return (key_exists('config', $configs) && count($configs) === 1)
+    ? $configs
+    : null
+    ;
 }
