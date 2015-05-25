@@ -13,24 +13,27 @@ $args->addOption(array('civi-root', 'r'), array(
   ));
 
 $args->addOption(array('input-file', 'f'), array(
+  'default' => STDIN,
   'description' => 'File to act on',
 ));
 
-$userInput = $args->getArguments();
+$args->addOption(array('id-col', 'i'), array(
+  'default' => 'Internal Contact ID',
+  'description' => 'CiviCRM Contact ID Column',
+));
 
-if ($args['civi-root']) {
-  $CIVICRM_ROOT = $userInput['civi-root'];
-} else {
-  $CIVICRM_ROOT = $CONF_CIVICRM_ROOT;
-}
+/**
+ * END CONFIG
+ */
+
+$CIVICRM_ROOT = getOption('civi-root', $args);
 validateApiConfig();
 
+define('ID_COLUMN', getOption('id-col', $args));
+
 $main = 'processContacts';
-if ($args['input-file']) {
-  withFile($userInput['input-file'], $main);
-} else {
-  withStdIn($main);
-}
+$input = getOption('input-file', $args);
+withFile($input, $main);
 
 $fieldDefinition = array();
 function processContacts($line, $index) {
@@ -47,13 +50,13 @@ function processContact($cont) {
 
 function addToContactGroup($cont) {
   echo 'addToContactGroup'
-    . $cont['Internal Contact ID']
+    . $cont[ID_COLUMN]
     . "\n";
 }
 
 function markContactDeleted($cont) {
   echo 'markContactDeleted'
-    . $cont['Internal Contact ID']
+    . $cont[ID_COLUMN]
     . "\n";
 }
 
@@ -65,6 +68,24 @@ function markContactDeleted($cont) {
  */
 function echoLine($line, $index) {
   echo $index . ':' . $line . "\n";
+}
+
+/**
+ * Utility to get user option or it's default.
+ *
+ * @param string $opt option name
+ * @param array $args cli\Arguments object
+ * @return mixed
+ */
+function getOption($opt, $args) {
+  $user = $args->getArguments();
+  if ($args[$opt]) {
+    $val = $user[$opt];
+  } else {
+    $arg = $args->getOption($opt);
+    $val = ( key_exists('default', $arg) ) ? $arg['default'] : null;
+  }
+  return $val;
 }
 
 /**
@@ -135,20 +156,13 @@ function validateApiConfig() {
 }
 
 /**
- * Callback per line from STDIN
+ * Callback per input line.
  *
- * @param type $function_name e.g. - myCallback($line, $index) {...}
+ * @param file $file string or resource
+ * @param string $function_name e.g. - myCallback($line, $index) {...}
  * @param array $dontMask Optional. Remove items from character_mask argument to trim() - e.g. array("\n", "\t"); Note double-quotes.
- */
-function withStdIn($function_name, $dontMask = array()) {
-  withFile(STDIN, $function_name, $dontMask);
-}
-/**
- * Callback per line from $file
- *
- * @param type $function_name e.g. - myCallback($line, $index) {...}
- * @param array $dontMask Optional. Remove items from character_mask argument to trim() - e.g. array("\n", "\t"); Note double-quotes.
- */
+ * @throws Exception
+ **/
 function withFile($file, $function_name, $dontMask = array()) {
 
   if ( !is_resource($file)) {
