@@ -112,7 +112,7 @@ $fieldDefinition = array();
 function processContacts($line, $index) {
   global $fieldDefinition;
 
-  processContact(parseCSV($line, $index, $fieldDefinition));
+  processContact(parseCsv($line, $index, $fieldDefinition));
 }
 
 /**
