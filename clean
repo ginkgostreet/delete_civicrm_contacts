@@ -291,7 +291,7 @@ function withFile($file, $function_name, $dontMask = array()) {
   }
 
   $meta = stream_get_meta_data($file);
-  if (!$meta['uri'] != 'php://stdin') {
+  if ($meta['uri'] != 'php://stdin') {
     fclose($file);
   }
 }
