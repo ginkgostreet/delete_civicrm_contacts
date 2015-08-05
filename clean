@@ -2,6 +2,7 @@
 <?php
 
 require __DIR__ . '/vendor/autoload.php';
+require_once __DIR__ . '/includes/base.php';
 @extract(getConfig());
 
 $args = new \cli\Arguments();
@@ -19,6 +20,20 @@ $args->addOption(array('input-file', 'f'), array(
 $args->addOption(array('id-col', 'i'), array(
   'default' => 'Internal Contact ID',
   'description' => 'CiviCRM Contact ID Column',
+));
+
+//Todo: Make a way to dynamically list actions.
+$args->addOption(array('action', 'a'), array(
+  'default' => (@$config['Action']) ? $config['Action'] : null,
+  'description' => 'The action to Take',
+));
+$args->addOption(array('contact-type', 't'), array(
+  'default' => (@$config['contact_type']) ? $config['contact_type'] : 'Organization',
+  'description' => 'The type of contact to create',
+));
+$args->addOption(array('contact-sub-type', 's'), array(
+  'default' => (@$config['contact_sub_type']) ? $config['contact_sub_type'] : null,
+  'description' => 'The subtype of the contact(s) to be created',
 ));
 
 $args->addFlag(array('undelete', 'ctrl-z', 'z'), 'Remove contacts from the trash is_deleted => false');
@@ -42,305 +57,28 @@ if ($args['help']) {
  */
 
 define('CIVICRM_ROOT', getOption('civi-root', $args));
+bootstrap_civicrm();
 validateApiConfig();
 
-define('ID_COLUMN', getOption('id-col', $args));
 
-$input = getOption('input-file', $args);
+$action = getOption('action', $args);
 
-$jobDate = shell('date +"%F %R"');
+if (file_exists(__DIR__.'/includes/'.$action.'.php')) {
+  require(__DIR__.'/includes/'.$action.'.php');
+}
 
-if ($args['undelete']) {
-  define('UNDELETE', TRUE);
-  $apiTag = createJobTag($jobDate, 'UNDelete CiviCRM Contacts');
+$funcName = $action."_run";
+if(function_exists($funcName)) {
+  $funcName($args);
 } else {
-  define('UNDELETE', FALSE);
-  $apiTag = createJobTag($jobDate, 'Delete CiviCRM Contacts');
-}
-define('TAG_ID', $apiTag->id);
-
-$main = 'processContacts';
-withFile($input, $main);
-
-/**
- * Process a contact row
- *
- * @param array assoc $cont csv input line
- * @return void
- */
-function processContact($cont) {
-  if (!$cont) return;
-  tagContact($cont[ID_COLUMN], TAG_ID);
-  if (UNDELETE) {
-    removeFromTrash($cont[ID_COLUMN]);
-  } else {
-    markContactDeleted($cont[ID_COLUMN]);
-  }
+  die("Unknown Action");
 }
 
-/**
- * Call api contact.delete for contact ID
- *
- * @param int $cont_id
- */
-function markContactDeleted($cont_id) {
-  $apiResult = cvCli('contact', 'delete', array('id' => $cont_id));
-  if ($apiResult->is_error) {
-    cli\out(var_export($apiResult, TRUE));
-  } else {
-    cli\line("Contact ID#{$cont_id} moved to Trash.");
-  }
-}
 
-function removeFromTrash($cont_id) {
-  $apiResult = cvCli('contact', 'create', array('id' =>$cont_id, 'is_deleted'=> FALSE));
-  if ($apiResult->is_error) {
-    var_dump($apiResult);
-  } else {
-    cli\line("Contact ID#{$cont_id} removed from Trash.");
-  }
-}
 
-$fieldDefinition = array();
-/**
- * Called in the loop, so must use global variable;
- *
- * @global array $fieldDefinition
- * @param type $line
- * @param type $index
- */
-function processContacts($line, $index) {
-  global $fieldDefinition;
 
-  processContact(parseCsv($line, $index, $fieldDefinition));
-}
 
-/**
- * Tag CiviCRM Contact
- *
- * @param type $cont_id
- * @param type $tag_id
- * @return type
- */
-function tagContact($cont_id, $tag_id) {
-  return cvCli('entity_tag', 'create', array( 'contact_id' => $cont_id, 'tag_id' => $tag_id));
-}
 
-/**
- * Create a "Job" Tag based on a date and script verb.
- *
- * @param type $date_str
- * @param type $job_action
- * @return type
- */
-function createJobTag($date_str, $job_action) {
-  $apiResult = cvCli('tag', 'create', array('name' => "$date_str $job_action", 'description' => "Bulk Script $job_action Contacts $date_str" ));
 
-  $values = get_object_vars($apiResult->values);
-  foreach($values as $tag) {
-    cli\out("Created tag: {$tag->name} \n");
-  }
-  return $apiResult;
-}
 
-/**
- * diagnostic function
- *
- * @param type $line
- * @param type $index
- */
-function echoLine($line, $index) {
-  echo $index . ':' . $line . "\n";
-}
 
-/**
- * Utility to get user option or it's default.
- *
- * @param string $opt option name
- * @param array $args cli\Arguments object
- * @return mixed
- */
-function getOption($opt, $args) {
-  $user = $args->getArguments();
-  if ($args[$opt]) {
-    $val = $user[$opt];
-  } else {
-    $arg = $args->getOption($opt);
-    $val = ( key_exists('default', $arg) ) ? $arg['default'] : null;
-  }
-  return $val;
-}
-
-/**
- * Loop Callback utility to create an array from a csv file.
- * Associative array if $index and $fieldDefinition are provided.
- *
- * @param string $line
- * @param int $index
- * @param array $fieldDefinition keys
- * @return array
- */
-function parseCsv($line, $index=NULL, &$fieldDefinition=NULL) {
-  $values = str_getcsv($line, ',', '"');
-  if ($index === 0) {
-    $fieldDefinition = $values;
-  } else if ($fieldDefinition) {
-    if (count($fieldDefinition) == count($values)) {
-      return array_combine($fieldDefinition, $values);
-    } else {
-      cli\err("field definition did not match:\n". var_export($values, TRUE));
-    }
-  } else {
-    return $values;
-  }
-}
-
-/**
- * Use civicrm/bin/cli.php to call the API
- * NOTE: requires core hack to add --json output option.
- * https://gist.github.com/ginkgomzd/b26a750b2fbd3ce25950
- *
- * @param type $entity
- * @param type $action
- * @param type $params
- * @return type
- */
-function cvCli($entity, $action, $params = array()) {
-  $cmdApi = CIVICRM_ROOT.'/bin/cli.php';
-  $clParams = '';
-  foreach ($params as $key => $value) {
-    $clParams .= " --$key=\"$value\"";
-  }
-  $call = "php $cmdApi -e $entity -a $action $clParams --json";
-  $apiResult = json_decode(shell($call));
-
-  return $apiResult;
-}
-
-/**
- * Execute drush cvapi
- * confirm CiviCRM Root
- *
- * @param $apiCall e.g. ext.install key='org.civicrm.volunteer'
- * @param $toStdOut FALSE
- * @return PHP Object from CiviCRM API result
- **/
-function drushCVApi($entity, $action, $params, $toStdOut=FALSE) {
-  $CVAPI = 'drush cvapi';
-  $apiCall = "$entity.$action $params";
-
-  if (!is_dir(CIVICRM_ROOT)) {
-    throw new Exception('CIVICRM_ROOT is undefined');
-  }
-
-  $cacheDir = getcwd();
-  chdir(CIVICRM_ROOT);
-
-  $output = $return_var = null;
-  if ($toStdOut) {
-    system("$CVAPI $apiCall --out=pretty", $return_var);
-    chdir($cacheDir);
-    return $return_var;
-  } else {
-    exec("$CVAPI $apiCall --out=json", $output, $return_var);
-    chdir($cacheDir);
-    return json_decode(join($output));
-  }
-}
-
-function validateApiConfig() {
-  $apiResult = cvCli('domain', 'get');
-
-  if (!$apiResult || $apiResult->is_error == 1) {
-    echo "FAILED to validate API connection\n";
-    if (@$apiResult->is_error) {
-      echo $apiResult->error_message;
-    }
-    die("\nexit");
-  }
-}
-
-/**
- * Callback per input line.
- *
- * @param file $file string or resource
- * @param string $function_name e.g. - myCallback($line, $index) {...}
- * @param array $dontMask Optional. Remove items from character_mask argument to trim() - e.g. array("\n", "\t"); Note double-quotes.
- * @throws Exception
- **/
-function withFile($file, $function_name, $dontMask = array()) {
-
-  if ( !is_resource($file)) {
-    //try to open it
-    $file = fopen($file, 'r');
-  } else if (get_resource_type($file) !== "stream") {
-    throw new Exception("Resources is not a file.");
-  }
-
-  if ( !function_exists($function_name)) {
-    throw new Exception("function name, \"$function_name\" does not exist;");
-  }
-
-  $dontMask = array_fill_keys($dontMask, '');
-  $charmask = strtr(" \t\n\r\0\x0B", $dontMask);
-
-  $n=0;
-  while (($line = fgets($file)) !== FALSE) {
-    $function_name(trim($line, $charmask), $n);
-    $n++;
-  }
-
-  $meta = stream_get_meta_data($file);
-  if ($meta['uri'] != 'php://stdin') {
-    fclose($file);
-  }
-}
-
-/**
- * Wrap php exec function with some helpers.
- * Returns output of command.
- *
- * @param type $call system call
- * @param string $chDir execute command in this dir
- * @return string
- */
-function shell($call, $chDir=NULL) {
-  if ($chDir) {
-    $cacheDir = getcwd();
-    chdir(CIVICRM_ROOT);
-  }
-  exec($call, $output, $return_var);
-
-  if ($chDir) {
-    chdir($cacheDir);
-  }
-
-  return join($output);
-}
-
-/**
- * Try to get configs from a .conf file.
- *
- * e.g. -
- * {
- *   "config": {
- *   "CIVICRM_ROOT": "/var/www/ncba/ncba/sites/all/modules/civicrm"
- *   }
- * }
- *
- * usage: @extract(getConfig());
- *
- * Safety for extract... enforce use of "config" envelope;
- *
- * @return array associative
- */
-function getConfig() {
-  $confFile = __DIR__.'/.conf';
-  if (file_exists($confFile)) {
-    $configs = json_decode(file_get_contents($confFile), TRUE); //assoc array
-  }
-  return (key_exists('config', $configs) && count($configs) === 1)
-    ? $configs
-    : null
-    ;
-}
