@@ -1,6 +1,7 @@
 {
     "name": "gsl/delete_contacts",
     "description": "Delete CiviCRM Contacts from STDIN.",
+    "license": "GPL-2.0",
     "require": {
         "wp-cli/php-cli-tools": "0.10.*"
     },
